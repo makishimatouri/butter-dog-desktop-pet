@@ -1,0 +1,42 @@
+{
+  "name": "butter-dog-desktop-pet",
+  "version": "0.1.0",
+  "description": "A portable Windows desktop pet featuring Butter Dog.",
+  "main": "src/main.js",
+  "author": "Dongli",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win portable zip",
+    "dist": "electron-builder"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.dongli.butterdog",
+    "productName": "Butter Dog",
+    "asar": true,
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "portable",
+        "zip"
+      ],
+      "artifactName": "Butter-Dog-${version}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Butter-Dog-Portable-${version}-${arch}.${ext}"
+    }
+  }
+}
