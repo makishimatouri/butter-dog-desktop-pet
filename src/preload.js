@@ -1,6 +1,24 @@
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-contextBridge.exposeInMainWorld("butterDog", {
-  showContextMenu: () => ipcRenderer.invoke("show-context-menu"),
-  moveWindowBy: (x, y) => ipcRenderer.send("move-window-by", { x, y })
+contextBridge.exposeInMainWorld('butterDog', {
+  filePathFor(file) {
+    return webUtils.getPathForFile(file);
+  },
+  trashFiles(filePaths) {
+    return ipcRenderer.invoke('trash-files', filePaths);
+  },
+  openTrash() {
+    return ipcRenderer.invoke('open-trash');
+  },
+  getScale() {
+    return ipcRenderer.invoke('get-pet-scale');
+  },
+  onScaleChanged(callback) {
+    const listener = (_event, scale) => callback(scale);
+    ipcRenderer.on('pet-scale-changed', listener);
+    return () => ipcRenderer.removeListener('pet-scale-changed', listener);
+  },
+  moveWindow(bounds) {
+    ipcRenderer.send('move-window', bounds);
+  }
 });

@@ -1,42 +1,18 @@
 {
-  "name": "butter-dog-desktop-pet",
+  "name": "butter-dog-trash-pet",
   "version": "0.1.0",
-  "description": "A portable Windows desktop pet featuring Butter Dog.",
+  "description": "A Butter Dog desktop pet that eats dropped files and moves them to the OS trash.",
   "main": "src/main.js",
-  "author": "Dongli",
-  "license": "UNLICENSED",
   "private": true,
   "scripts": {
     "start": "electron .",
-    "dist:win": "electron-builder --win portable zip",
-    "dist": "electron-builder"
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer.js && node scripts/smoke-test.js",
+    "package:win": "electron-packager . ButterDogTrash --platform=win32 --arch=x64 --out=dist --overwrite",
+    "package:mac": "electron-packager . ButterDogTrash --platform=darwin --arch=x64 --out=dist --overwrite",
+    "package:mac:arm64": "electron-packager . ButterDogTrash --platform=darwin --arch=arm64 --out=dist --overwrite"
   },
-  "dependencies": {},
   "devDependencies": {
-    "electron": "^33.4.11",
-    "electron-builder": "^25.1.8"
-  },
-  "build": {
-    "appId": "com.dongli.butterdog",
-    "productName": "Butter Dog",
-    "asar": true,
-    "files": [
-      "src/**/*",
-      "assets/**/*",
-      "package.json"
-    ],
-    "directories": {
-      "output": "release"
-    },
-    "win": {
-      "target": [
-        "portable",
-        "zip"
-      ],
-      "artifactName": "Butter-Dog-${version}-${arch}.${ext}"
-    },
-    "portable": {
-      "artifactName": "Butter-Dog-Portable-${version}-${arch}.${ext}"
-    }
+    "@electron/packager": "^18.3.6",
+    "electron": "^43.1.0"
   }
 }

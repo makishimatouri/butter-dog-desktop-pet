@@ -22,13 +22,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build portable app
-        run: npm run dist:win
+      - name: Check app
+        run: npm run check
+
+      - name: Build Windows app
+        run: npm run package:win
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Butter-Dog-Windows-Portable
+          name: ButterDogTrash-win32-x64
           path: |
-            release/*.exe
-            release/*.zip
+            dist/ButterDogTrash-win32-x64/**

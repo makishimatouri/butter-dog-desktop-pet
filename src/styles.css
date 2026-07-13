@@ -1,3 +1,15 @@
+:root {
+  color-scheme: light;
+  --cell-width: 192px;
+  --cell-height: 208px;
+  --scale: 1;
+}
+
+* {
+  box-sizing: border-box;
+  user-select: none;
+}
+
 html,
 body {
   width: 100%;
@@ -5,30 +17,148 @@ body {
   margin: 0;
   overflow: hidden;
   background: transparent;
-  user-select: none;
-  -webkit-user-select: none;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-body {
+.pet {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
   display: grid;
-  place-items: center;
-}
-
-#stage {
-  width: 220px;
-  height: 250px;
-  display: grid;
-  place-items: center;
-  background: transparent;
-}
-
-#pet {
-  width: 192px;
-  height: 208px;
-  image-rendering: auto;
+  place-items: end center;
+  padding-bottom: calc(18px * var(--scale));
   cursor: grab;
 }
 
-#pet:active {
+.pet.dragging {
   cursor: grabbing;
+}
+
+.sprite {
+  width: calc(var(--cell-width) * var(--scale));
+  height: calc(var(--cell-height) * var(--scale));
+  background-image: url("../assets/spritesheet.webp");
+  background-repeat: no-repeat;
+  background-size: calc(1536px * var(--scale)) calc(2288px * var(--scale));
+  image-rendering: auto;
+  filter: drop-shadow(0 calc(12px * var(--scale)) calc(12px * var(--scale)) rgba(40, 34, 20, 0.2));
+  transform-origin: 50% 82%;
+}
+
+.pet.hungry .sprite {
+  animation: hungry-bounce 560ms ease-in-out infinite;
+}
+
+.pet.eating .sprite {
+  animation: chomp 420ms ease-in-out 3;
+}
+
+.drop-hint {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  min-width: calc(76px * var(--scale));
+  padding: calc(7px * var(--scale)) calc(10px * var(--scale));
+  border: 1px solid rgba(56, 38, 6, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 249, 222, 0.92);
+  color: #4f3909;
+  font-size: calc(13px * var(--scale));
+  font-weight: 650;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+  box-shadow: 0 calc(8px * var(--scale)) calc(20px * var(--scale)) rgba(61, 42, 12, 0.12);
+}
+
+.pet.hungry .drop-hint,
+.pet.eating .drop-hint {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.file-bite {
+  position: absolute;
+  left: 50%;
+  top: 40px;
+  width: calc(34px * var(--scale));
+  height: calc(42px * var(--scale));
+  border: calc(2px * var(--scale)) solid #313131;
+  border-radius: calc(5px * var(--scale));
+  background:
+    linear-gradient(135deg, transparent 0, transparent calc(14px * var(--scale)), #dbeeff calc(14px * var(--scale)), #dbeeff calc(22px * var(--scale)), transparent calc(22px * var(--scale))),
+    #ffffff;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(-12px) rotate(-8deg);
+}
+
+.pet.eating .file-bite {
+  animation: file-to-mouth 760ms ease-in forwards;
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  max-width: 210px;
+  transform: translateX(-50%) translateY(8px);
+  padding: calc(7px * var(--scale)) calc(10px * var(--scale));
+  border-radius: calc(9px * var(--scale));
+  background: rgba(34, 32, 25, 0.86);
+  color: #fff;
+  font-size: calc(12px * var(--scale));
+  line-height: 1.3;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@keyframes hungry-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  45% {
+    transform: translateY(-6px) scale(1.02, 0.98);
+  }
+}
+
+@keyframes chomp {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  30% {
+    transform: translateY(4px) scale(1.08, 0.88) rotate(-2deg);
+  }
+  60% {
+    transform: translateY(-3px) scale(0.96, 1.05) rotate(2deg);
+  }
+}
+
+@keyframes file-to-mouth {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-14px) scale(0.8) rotate(-8deg);
+  }
+  25% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(98px) scale(0.72) rotate(8deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(116px) scale(0.1) rotate(16deg);
+  }
 }

@@ -1,149 +1,237 @@
-const path = require("path");
-const fs = require("fs");
-const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, screen } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
+const { spawn } = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 let mainWindow;
-let tray;
-let isQuitting = false;
+let currentPetScale = 1;
 
-const WINDOW_WIDTH = 220;
-const WINDOW_HEIGHT = 250;
+const BASE_WINDOW_SIZE = {
+  width: 260,
+  height: 300
+};
 
-app.disableHardwareAcceleration();
-
-function settingsPath() {
-  return path.join(app.getPath("userData"), "settings.json");
-}
-
-function readSettings() {
-  try {
-    return JSON.parse(fs.readFileSync(settingsPath(), "utf8"));
-  } catch {
-    return {};
-  }
-}
-
-function writeSettings(settings) {
-  fs.mkdirSync(app.getPath("userData"), { recursive: true });
-  fs.writeFileSync(settingsPath(), JSON.stringify(settings, null, 2));
-}
-
-function getInitialBounds() {
-  const saved = readSettings().bounds;
-  if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
-    return { x: saved.x, y: saved.y, width: WINDOW_WIDTH, height: WINDOW_HEIGHT };
-  }
-
-  const area = screen.getPrimaryDisplay().workArea;
-  return {
-    x: Math.round(area.x + area.width - WINDOW_WIDTH - 48),
-    y: Math.round(area.y + area.height - WINDOW_HEIGHT - 48),
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT
-  };
-}
+const PET_SIZES = [
+  { label: '小', scale: 0.85 },
+  { label: '标准', scale: 1 },
+  { label: '大', scale: 1.25 },
+  { label: '特大', scale: 1.5 }
+];
 
 function createWindow() {
+  currentPetScale = readConfig().scale;
+  const initialSize = windowSizeForScale(currentPetScale);
+
   mainWindow = new BrowserWindow({
-    ...getInitialBounds(),
-    frame: false,
+    width: initialSize.width,
+    height: initialSize.height,
+    minWidth: 200,
+    minHeight: 230,
     transparent: true,
+    frame: false,
     resizable: false,
-    hasShadow: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    backgroundColor: "#00000000",
+    hasShadow: false,
+    backgroundColor: '#00000000',
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false
     }
   });
 
-  mainWindow.setAlwaysOnTop(true, "floating");
-  mainWindow.loadFile(path.join(__dirname, "index.html"));
-
-  mainWindow.on("moved", () => {
-    if (!mainWindow) return;
-    const [x, y] = mainWindow.getPosition();
-    writeSettings({ ...readSettings(), bounds: { x, y } });
+  mainWindow.setMenuBarVisibility(false);
+  mainWindow.loadFile(path.join(__dirname, 'renderer.html'));
+  mainWindow.webContents.once('did-finish-load', () => {
+    mainWindow.webContents.send('pet-scale-changed', currentPetScale);
   });
 
-  mainWindow.on("close", (event) => {
-    if (isQuitting) return;
-    event.preventDefault();
-    mainWindow.hide();
-  });
-}
-
-function createTray() {
-  const atlas = nativeImage.createFromPath(path.join(__dirname, "..", "assets", "butter-dog-spritesheet.webp"));
-  const icon = atlas.isEmpty()
-    ? nativeImage.createEmpty()
-    : atlas.crop({ x: 0, y: 0, width: 192, height: 208 }).resize({ width: 16, height: 16 });
-  tray = new Tray(icon);
-  tray.setToolTip("Butter Dog");
-  tray.setContextMenu(buildMenu());
-  tray.on("click", () => {
-    if (!mainWindow) return;
-    mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show();
+  mainWindow.webContents.on('context-menu', (_event, params) => {
+    buildPetMenu().popup({
+      window: mainWindow,
+      x: params.x,
+      y: params.y,
+      sourceType: params.menuSourceType
+    });
   });
 }
 
-function buildMenu() {
+function buildPetMenu() {
+  const extensionItems = [
+    {
+      label: '调整大小',
+      submenu: PET_SIZES.map((size) => ({
+        label: size.label,
+        type: 'radio',
+        checked: Math.abs(currentPetScale - size.scale) < 0.001,
+        click: () => setPetScale(size.scale)
+      }))
+    }
+  ];
+
   return Menu.buildFromTemplate([
     {
-      label: "显示 / 隐藏",
-      click: () => {
-        if (!mainWindow) return;
-        mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show();
-      }
+      label: '打开回收站',
+      click: () => openTrashLocation()
     },
+    ...extensionItems,
+    { type: 'separator' },
     {
-      label: "置顶",
-      type: "checkbox",
-      checked: mainWindow ? mainWindow.isAlwaysOnTop() : true,
-      click: (item) => {
-        if (!mainWindow) return;
-        mainWindow.setAlwaysOnTop(item.checked, "floating");
-      }
-    },
-    { type: "separator" },
-    {
-      label: "退出",
-      click: () => {
-        isQuitting = true;
-        app.quit();
-      }
+      label: '退出黄油小狗',
+      click: () => app.quit()
     }
   ]);
 }
 
-ipcMain.handle("show-context-menu", () => {
-  buildMenu().popup({ window: mainWindow });
+function configPath() {
+  return path.join(app.getPath('userData'), 'settings.json');
+}
+
+function readConfig() {
+  try {
+    const raw = fs.readFileSync(configPath(), 'utf8');
+    const config = JSON.parse(raw);
+    const scale = normalizePetScale(config.scale);
+    return { scale };
+  } catch (_error) {
+    return { scale: 1 };
+  }
+}
+
+function writeConfig(config) {
+  fs.mkdirSync(app.getPath('userData'), { recursive: true });
+  fs.writeFileSync(configPath(), `${JSON.stringify(config, null, 2)}\n`);
+}
+
+function normalizePetScale(scale) {
+  const numericScale = Number(scale);
+  const supported = PET_SIZES.find((size) => Math.abs(size.scale - numericScale) < 0.001);
+  return supported ? supported.scale : 1;
+}
+
+function windowSizeForScale(scale) {
+  return {
+    width: Math.round(BASE_WINDOW_SIZE.width * scale),
+    height: Math.round(BASE_WINDOW_SIZE.height * scale)
+  };
+}
+
+function setPetScale(scale, options = {}) {
+  const normalizedScale = normalizePetScale(scale);
+  currentPetScale = normalizedScale;
+
+  if (options.persist !== false) {
+    writeConfig({ scale: normalizedScale });
+  }
+
+  if (mainWindow && options.resize !== false) {
+    const bounds = mainWindow.getBounds();
+    const size = windowSizeForScale(normalizedScale);
+
+    mainWindow.setBounds({
+      x: Math.round(bounds.x + (bounds.width - size.width) / 2),
+      y: Math.round(bounds.y + bounds.height - size.height),
+      width: size.width,
+      height: size.height
+    });
+  }
+
+  if (mainWindow) {
+    mainWindow.webContents.send('pet-scale-changed', normalizedScale);
+  }
+}
+
+async function openTrashLocation() {
+  if (process.platform === 'win32') {
+    spawn('explorer.exe', ['shell:RecycleBinFolder'], {
+      detached: true,
+      stdio: 'ignore'
+    }).unref();
+    return;
+  }
+
+  if (process.platform === 'darwin') {
+    await shell.openPath(path.join(os.homedir(), '.Trash'));
+    return;
+  }
+
+  await shell.openExternal('trash:///');
+}
+
+async function trashFiles(filePaths) {
+  const results = [];
+
+  for (const filePath of filePaths) {
+    const resolvedPath = path.resolve(filePath);
+
+    try {
+      if (!fs.existsSync(resolvedPath)) {
+        throw new Error('文件不存在或已被移动');
+      }
+
+      await shell.trashItem(resolvedPath);
+      results.push({ path: resolvedPath, ok: true });
+    } catch (error) {
+      results.push({
+        path: resolvedPath,
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  return {
+    ok: results.every((result) => result.ok),
+    results
+  };
+}
+
+ipcMain.handle('trash-files', (_event, filePaths) => {
+  if (!Array.isArray(filePaths)) {
+    return { ok: false, results: [], error: '拖入内容格式不正确' };
+  }
+
+  return trashFiles(filePaths.filter(Boolean));
 });
 
-ipcMain.on("move-window-by", (_event, delta) => {
-  if (!mainWindow || !delta) return;
-  const [x, y] = mainWindow.getPosition();
-  const dx = Number.isFinite(delta.x) ? delta.x : 0;
-  const dy = Number.isFinite(delta.y) ? delta.y : 0;
-  mainWindow.setPosition(Math.round(x + dx), Math.round(y + dy));
-});
+ipcMain.handle('open-trash', () => openTrashLocation());
+ipcMain.handle('get-pet-scale', () => currentPetScale);
 
-app.whenReady().then(() => {
-  createWindow();
-  createTray();
+ipcMain.on('move-window', (_event, bounds) => {
+  if (!mainWindow || !bounds) {
+    return;
+  }
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  mainWindow.setBounds({
+    x: Math.round(bounds.x),
+    y: Math.round(bounds.y),
+    width: mainWindow.getBounds().width,
+    height: mainWindow.getBounds().height
   });
 });
 
-app.on("before-quit", () => {
-  isQuitting = true;
+app.whenReady().then(() => {
+  Menu.setApplicationMenu(null);
+  createWindow();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
 });
 
-app.on("window-all-closed", (event) => {
-  event.preventDefault();
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });
+
+module.exports = {
+  buildPetMenu,
+  openTrashLocation,
+  setPetScale,
+  trashFiles
+};
